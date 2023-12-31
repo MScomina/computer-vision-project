@@ -155,3 +155,7 @@ Makefile
 # The folders containing the training and testing images
 dataset/train
 dataset/test
+
+# Ignore every file that is not a .py file in model/
+model/*
+!model/*.py
