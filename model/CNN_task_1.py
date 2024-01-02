@@ -31,7 +31,8 @@ class CNN_task_1(nn.Module):
             nn.Conv2d(in_channels=16, out_channels=32, kernel_size=self.conv_kernel_sizes, stride=1, padding=self.padding),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(in_features=self.last_input_size, out_features=15)
+            nn.Linear(in_features=self.last_input_size, out_features=15),
+            nn.Softmax(dim=1)
         )
 
         # Initialize weights:
@@ -47,6 +48,4 @@ class CNN_task_1(nn.Module):
 
 
     def forward(self, x):
-        return nn.functional.softmax(self.layers(x), dim=1)
-        
-        
+        return self.layers(x)
