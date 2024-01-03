@@ -157,7 +157,7 @@ dataset/train
 dataset/test
 
 # Ignore every file that is not a .py file in model/
-model/*
-!model/*.py
+models/*
+!models/*.py
 
 plots/*

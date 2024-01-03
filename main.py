@@ -1,10 +1,11 @@
 import torch
 import numpy as np
-from tasks.task_1 import task_1
+from tasks import tasks
 
 if __name__ == "__main__":
 
     torch.manual_seed(314)
     np.random.seed(314)
 
-    task_1()
+    tasks.task_1(EPOCHS=500)
+    tasks.task_2(EPOCHS=500)
