@@ -3,14 +3,14 @@ import torch
 from collections import OrderedDict
 from torch.utils.data import DataLoader
 
-def train_model(model : torch.nn.Module, train_loader : DataLoader, val_loader : DataLoader, loss : torch.nn.modules.loss._Loss, optimizer : torch.optim.Optimizer,
-                 device : torch.device, epochs : int, epoch_print_ratio : int = 10) -> tuple[OrderedDict, list[float], list[float], list[float], list[float]]:
+def train_model(model : torch.nn.Module | list[torch.nn.Module], train_loader : DataLoader, val_loader : DataLoader, loss : torch.nn.modules.loss._Loss, optimizer : torch.optim.Optimizer,
+                 device : torch.device, max_epochs : int, epoch_print_ratio : int = 10, early_stopping : bool = True, patience : int = 100) -> tuple[OrderedDict, list[float], list[float], list[float], list[float]]:
     """
         This function trains the passed model up to the number of epochs specified and then returns *the state_dict()* of the model with the lowest loss on the validation set, as well as the training and validation losses and accuracies.
     
         The original model passed to this function is modified in-place. This means that the model passed is the one trained up to the number of epochs, while the returned model is the one with the lowest validation loss.
     """
-    epoch_print = epochs//epoch_print_ratio
+    epoch_print = max_epochs//epoch_print_ratio
     best_validation_loss = np.inf
     train_losses = []
     val_losses = []
@@ -18,10 +18,12 @@ def train_model(model : torch.nn.Module, train_loader : DataLoader, val_loader :
     val_accuracies = []
     best_model_state_dict = model.state_dict()
 
+    epochs_without_improvement = 0
+
     # Training loop
-    for epoch in range(epochs):
+    for epoch in range(max_epochs):
         if epoch % epoch_print == 0:
-            print(f"Epoch {epoch + 1} of {epochs}")
+            print(f"Epoch {epoch + 1} of {max_epochs}")
         model.train()
         train_loss = 0
         correct = 0
@@ -73,6 +75,13 @@ def train_model(model : torch.nn.Module, train_loader : DataLoader, val_loader :
                 print(f"Found new best model, validation loss: {val_loss}, validation accuracy: {val_acc*100}%")
                 best_model_state_dict = model.state_dict()
                 best_validation_loss = val_loss
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+                # Early stopping if validation loss has not improved for the last patience epochs.
+                if early_stopping and epochs_without_improvement >= patience:
+                    print(f'Stopping training due to lack of improvement in last {patience} epochs.')
+                    return (best_model_state_dict, train_losses, val_losses, train_accuracies, val_accuracies)
 
     return (best_model_state_dict, train_losses, val_losses, train_accuracies, val_accuracies)
 
