@@ -3,9 +3,11 @@ from torchvision import transforms, datasets
 
 from models.CNN_task_1 import CNN_task_1
 from models.CNN_task_2 import ensemble_task_2
+from models.CNN_task_3 import CNN_task_3_classifier, CNN_task_3_svm
 
 from helper.trainer import train_model, test_model
 from helper.plotter import save_loss_accuracy_plot
+from helper.dataset_composer import generate_dataloaders
 
 # Debug constants
 _EPOCH_PRINT_RATIO = 10
@@ -30,6 +32,9 @@ _BATCH_NORMALIZATION = True
 _DROPOUT = 0.3
 _NUMBER_OF_MODELS = 5
 
+# Task 3
+_EPOCHS_SVM = 3
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def task_1(SPLIT_RATIO=_SPLIT_RATIO, BATCH_SIZE=_BATCH_SIZE, LEARNING_RATE=_LEARNING_RATE, MOMENTUM=_MOMENTUM, MAX_EPOCHS=_MAX_EPOCHS, 
@@ -44,19 +49,13 @@ def task_1(SPLIT_RATIO=_SPLIT_RATIO, BATCH_SIZE=_BATCH_SIZE, LEARNING_RATE=_LEAR
         transforms.Lambda(lambda x: x * 255)
     ])
 
-    # Load datasets
-    full_training_data = datasets.ImageFolder(root="dataset/train", transform=transform)
-    test_dataset = datasets.ImageFolder(root="dataset/test", transform=transform)
-
-    # Split training data into training and validation sets
-    train_size = int(SPLIT_RATIO * len(full_training_data))
-    val_size = len(full_training_data) - train_size
-    train_dataset, val_dataset = torch.utils.data.random_split(full_training_data, [train_size, val_size])
-
-    # Create data loaders
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    train_loader, val_loader, test_loader = \
+        generate_dataloaders(
+            "dataset", 
+            transform, 
+            split_ratio=SPLIT_RATIO, 
+            batch_size=BATCH_SIZE
+        )
 
     model = CNN_task_1().to(device)
 
@@ -136,32 +135,13 @@ def task_2(SPLIT_RATIO=_SPLIT_RATIO, BATCH_SIZE=_BATCH_SIZE, LEARNING_RATE=_LEAR
         transforms.Normalize(mean=[0.5], std=[0.5])                                             # Normalize image to [-1, 1]
     ])
 
-    # Load datasets
-    full_training_data = datasets.ImageFolder(root="dataset/train")
-    test_dataset = datasets.ImageFolder(root="dataset/test", transform=transform)
-
-    # Split training data into training and validation sets
-    # Note: i couldn't rely on torch.utils.data.random_split() because it doesn't let you specify different transforms for each dataset.
-    train_size = int(SPLIT_RATIO * len(full_training_data))
-    indices = torch.randperm(len(full_training_data)).tolist()
-    train_indices = indices[:train_size]
-    val_indices = indices[train_size:]
-
-    # Create new datasets with the desired transforms
-    train_dataset = datasets.ImageFolder(root="dataset/train", transform=data_augmentation_transform)
-    val_dataset = datasets.ImageFolder(root="dataset/train", transform=transform)
-
-    # Use the indices to get the corresponding data
-    train_dataset.samples = [train_dataset.samples[i] for i in train_indices]
-    train_dataset.targets = [train_dataset.targets[i] for i in train_indices]
-
-    val_dataset.samples = [val_dataset.samples[i] for i in val_indices]
-    val_dataset.targets = [val_dataset.targets[i] for i in val_indices]
-
-    # Create data loaders
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    train_loader, val_loader, test_loader = \
+        generate_dataloaders(
+            "dataset",
+            (data_augmentation_transform, transform, transform),
+            split_ratio=SPLIT_RATIO,
+            batch_size=BATCH_SIZE
+        )
 
     model = ensemble_task_2(
         number_of_models=NUMBER_OF_MODELS,
@@ -214,3 +194,107 @@ def task_2(SPLIT_RATIO=_SPLIT_RATIO, BATCH_SIZE=_BATCH_SIZE, LEARNING_RATE=_LEAR
         values_str, 
         "plots/loss_and_accuracy_task_2.png"
     )
+
+
+
+
+
+
+def task_3(SPLIT_RATIO=_SPLIT_RATIO, BATCH_SIZE=_BATCH_SIZE, LEARNING_RATE=_LEARNING_RATE, MOMENTUM=_MOMENTUM, MAX_EPOCHS=_MAX_EPOCHS,
+            EPOCH_PRINT_RATIO=_EPOCH_PRINT_RATIO, EARLY_STOPPING=_EARLY_STOPPING, PATIENCE=_PATIENCE, EPOCHS_SVM=_EPOCHS_SVM):
+    
+    # Anisotropic scaling and conversion to tensor.
+    # AlexNet expects 3-channel images and 224x224 images.
+    # https://proceedings.neurips.cc/paper_files/paper/2012/file/c399862d3b9d6b76c8436e924a68c45b-Paper.pdf
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.Grayscale(num_output_channels=3),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])             # Normalize image to ImageNet mean and std
+    ])
+
+    data_augmentation_transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),                                                      # Randomly flip image horizontally
+        transforms.RandomRotation(degrees=10),                                                  # Randomly rotate image
+        transforms.RandomChoice([                                                               # Randomly choose whether apply anisotropic rescaling or random cropping (2 to 1 ratio).  
+            transforms.Resize((224, 224)),
+            transforms.Resize((224, 224)),
+            transforms.Compose([
+                transforms.RandomCrop(160),
+                transforms.Resize(224)
+            ])
+        ]),
+        transforms.Grayscale(num_output_channels=3),
+        transforms.ToTensor(),
+        transforms.Lambda(lambda x: torch.clamp(x + 0.01*torch.randn_like(x),min=0.,max=1.)),   # Add random noise to image.
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])             # Normalize image to ImageNet mean and std
+    ])
+
+    train_loader, val_loader, test_loader = \
+        generate_dataloaders(
+            "dataset",
+            (data_augmentation_transform, transform, transform),
+            split_ratio=SPLIT_RATIO,
+            batch_size=BATCH_SIZE
+        )
+
+    model = CNN_task_3_classifier().to(device)
+
+    loss = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+
+    # Train and save model and training and validation losses and accuracies
+    best_model, train_losses, val_losses, train_accuracies, val_accuracies = \
+        train_model(
+            model, 
+            train_loader, 
+            val_loader, 
+            loss, 
+            optimizer, 
+            device, 
+            MAX_EPOCHS, 
+            epoch_print_ratio=EPOCH_PRINT_RATIO,
+            early_stopping=EARLY_STOPPING,
+            patience=PATIENCE
+        )
+
+    # Load best model
+    model.load_state_dict(best_model)
+
+    # We only have to save the last layer of the model, since the rest is frozen and can be loaded from torchvision.
+    torch.save(model.alexnet.classifier[6].state_dict(), "models/model_task_3.pt")
+
+    # Test model
+    test_accuracy = test_model(model, test_loader, device)
+    print(f"Test accuracy: {test_accuracy}%")
+
+    values_str = (
+        f'Split Ratio: {SPLIT_RATIO}   Batch Size: {BATCH_SIZE}   Total Epochs: {len(val_accuracies)-1}\n'
+        f'Learning Rate: {LEARNING_RATE}   Momentum: {MOMENTUM}   Max Epochs: {MAX_EPOCHS}\n'
+    )
+
+    # Save plot
+    save_loss_accuracy_plot(
+        train_losses, 
+        val_losses, 
+        train_accuracies, 
+        val_accuracies, 
+        test_accuracy, 
+        values_str, 
+        "plots/loss_and_accuracy_task_3_classifier.png"
+    )
+
+    # SVM model
+    svm_model = CNN_task_3_svm(
+        train_dataloader=train_loader, 
+        path="models/model_task_3_svm",
+        device=device,
+        epochs=EPOCHS_SVM,
+        linear_svm=True
+    ).to(device)
+
+    # Test accuracy
+    test_accuracy = test_model(svm_model, test_loader, device)
+    print(f"Test accuracy: {test_accuracy}%")
+
+    svm_model.save_model("models/model_task_3_svm")
