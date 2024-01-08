@@ -21,7 +21,6 @@ class CNN_task_3_classifier(nn.Module):
         self.alexnet.classifier[6].requires_grad = True
         self.alexnet.classifier[6].weight.requires_grad = True
         self.alexnet.classifier[6].bias.requires_grad = True
-        self.alexnet.classifier.append(nn.Softmax(dim=1))
         
     def forward(self, x):
         return self.alexnet(x)

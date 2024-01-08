@@ -19,11 +19,11 @@ _SPLIT_RATIO = 0.85
 _BATCH_SIZE = 32
 
 # Task 1
-_LEARNING_RATE = 1e-3
+_LEARNING_RATE = 1e-3   
 _MOMENTUM = 0.9
 _MAX_EPOCHS = 1000
 _EARLY_STOPPING = True
-_PATIENCE = 150
+_PATIENCE = 30
 
 # Task 2
 _CONV_KERNEL_SIZES = (3, 3, 3)
@@ -31,6 +31,8 @@ _PADDING = (1, 1, 1)
 _BATCH_NORMALIZATION = True
 _DROPOUT = 0.3
 _NUMBER_OF_MODELS = 5
+_BETA = 1.0
+_CAP = 10.0
 
 # Task 3
 _EPOCHS_SVM = 3
@@ -60,21 +62,22 @@ def task_1(SPLIT_RATIO=_SPLIT_RATIO, BATCH_SIZE=_BATCH_SIZE, LEARNING_RATE=_LEAR
     model = CNN_task_1().to(device)
 
     loss = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
 
     # Train and save model and training and validation losses and accuracies
     best_model, train_losses, val_losses, train_accuracies, val_accuracies = \
         train_model(
-            model,
-            train_loader, 
-            val_loader, 
-            loss, 
-            optimizer, 
-            device, 
-            MAX_EPOCHS, 
+            model=model,
+            train_loader=train_loader, 
+            val_loader=val_loader, 
+            loss=loss, 
+            device=device, 
+            max_epochs=MAX_EPOCHS, 
+            learning_rate=LEARNING_RATE,
             epoch_print_ratio=EPOCH_PRINT_RATIO, 
             early_stopping=EARLY_STOPPING, 
-            patience=PATIENCE
+            patience=PATIENCE,
+            is_adam=False,
+            momentum=MOMENTUM
         )
 
     # Load best model
@@ -108,7 +111,8 @@ def task_1(SPLIT_RATIO=_SPLIT_RATIO, BATCH_SIZE=_BATCH_SIZE, LEARNING_RATE=_LEAR
 
 def task_2(SPLIT_RATIO=_SPLIT_RATIO, BATCH_SIZE=_BATCH_SIZE, LEARNING_RATE=_LEARNING_RATE, MOMENTUM=_MOMENTUM, MAX_EPOCHS=_MAX_EPOCHS,
             EPOCH_PRINT_RATIO=_EPOCH_PRINT_RATIO, CONV_KERNEL_SIZES=_CONV_KERNEL_SIZES, DROPOUT=_DROPOUT, PADDING=_PADDING,
-            EARLY_STOPPING=_EARLY_STOPPING, PATIENCE=_PATIENCE, BATCH_NORMALIZATION=_BATCH_NORMALIZATION, NUMBER_OF_MODELS=_NUMBER_OF_MODELS):
+            EARLY_STOPPING=_EARLY_STOPPING, PATIENCE=_PATIENCE, BATCH_NORMALIZATION=_BATCH_NORMALIZATION, NUMBER_OF_MODELS=_NUMBER_OF_MODELS,
+            BETA=_BETA, CAP=_CAP):
 
     # Anisotropic scaling and conversion to tensor.
     transform = transforms.Compose([
@@ -120,7 +124,7 @@ def task_2(SPLIT_RATIO=_SPLIT_RATIO, BATCH_SIZE=_BATCH_SIZE, LEARNING_RATE=_LEAR
 
     data_augmentation_transform = transforms.Compose([
         transforms.RandomHorizontalFlip(),                                                      # Randomly flip image horizontally
-        transforms.RandomRotation(degrees=10),                                                  # Randomly rotate image
+        transforms.RandomRotation(degrees=20),                                                  # Randomly rotate image
         transforms.RandomChoice([                                                               # Randomly choose whether apply anisotropic rescaling or random cropping (2 to 1 ratio).  
             transforms.Resize((64, 64)),
             transforms.Resize((64, 64)),
@@ -131,7 +135,7 @@ def task_2(SPLIT_RATIO=_SPLIT_RATIO, BATCH_SIZE=_BATCH_SIZE, LEARNING_RATE=_LEAR
         ]),
         transforms.Grayscale(),
         transforms.ToTensor(),
-        transforms.Lambda(lambda x: torch.clamp(x + 0.01*torch.randn_like(x),min=0.,max=1.)),   # Add random noise to image.
+        transforms.Lambda(lambda x: torch.clamp(x + 0.02*torch.randn_like(x),min=0.,max=1.)),   # Add random noise to image.
         transforms.Normalize(mean=[0.5], std=[0.5])                                             # Normalize image to [-1, 1]
     ])
 
@@ -148,22 +152,23 @@ def task_2(SPLIT_RATIO=_SPLIT_RATIO, BATCH_SIZE=_BATCH_SIZE, LEARNING_RATE=_LEAR
         conv_kernel_sizes=CONV_KERNEL_SIZES, 
         dropout=DROPOUT, 
         padding=PADDING, 
-        batch_normalization=BATCH_NORMALIZATION
+        batch_normalization=BATCH_NORMALIZATION,
+        beta=BETA,
+        cap=CAP
     ).to(device)
 
     loss = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     # Train and save model and training and validation losses and accuracies
     best_model, train_losses, val_losses, train_accuracies, val_accuracies = \
         train_model(
-            model, 
-            train_loader, 
-            val_loader, 
-            loss, 
-            optimizer, 
-            device, 
-            MAX_EPOCHS, 
+            model=model, 
+            train_loader=train_loader, 
+            val_loader=val_loader, 
+            loss=loss,
+            device=device, 
+            max_epochs=MAX_EPOCHS, 
+            learning_rate=LEARNING_RATE,
             epoch_print_ratio=EPOCH_PRINT_RATIO,
             early_stopping=EARLY_STOPPING,
             patience=PATIENCE
@@ -241,18 +246,17 @@ def task_3(SPLIT_RATIO=_SPLIT_RATIO, BATCH_SIZE=_BATCH_SIZE, LEARNING_RATE=_LEAR
     model = CNN_task_3_classifier().to(device)
 
     loss = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     # Train and save model and training and validation losses and accuracies
     best_model, train_losses, val_losses, train_accuracies, val_accuracies = \
         train_model(
-            model, 
-            train_loader, 
-            val_loader, 
-            loss, 
-            optimizer, 
-            device, 
-            MAX_EPOCHS, 
+            model=model, 
+            train_loader=train_loader, 
+            val_loader=val_loader, 
+            loss=loss, 
+            device=device, 
+            max_epochs=MAX_EPOCHS, 
+            learning_rate=LEARNING_RATE,
             epoch_print_ratio=EPOCH_PRINT_RATIO,
             early_stopping=EARLY_STOPPING,
             patience=PATIENCE
