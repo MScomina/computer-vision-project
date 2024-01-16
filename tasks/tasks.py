@@ -1,13 +1,13 @@
 import torch
-from torchvision import transforms, datasets
+from torchvision import transforms
 
 from models.CNN_task_1 import CNN_task_1
 from models.CNN_task_2 import ensemble_task_2
 from models.CNN_task_3 import CNN_task_3_classifier, CNN_task_3_svm
 
-from helper.trainer import train_model, test_model
-from helper.plotter import save_loss_accuracy_plot
-from helper.dataset_composer import generate_dataloaders
+from utils.trainer import train_model, test_model
+from utils.plotter import save_loss_accuracy_plot
+from utils.dataset_composer import generate_dataloaders
 
 # Debug constants
 _EPOCH_PRINT_RATIO = 10

@@ -161,3 +161,11 @@ models/*
 !models/*.py
 
 plots/*
+
+# Ignore every file that is not a tex, pdf or bib file in report/
+report/*
+!report/*.pdf
+!report/*.tex
+!report/*.bib
+
+.vscode
