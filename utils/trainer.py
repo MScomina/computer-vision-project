@@ -70,10 +70,12 @@ def train_model(model : torch.nn.Module | ensemble_task_2, train_loader : DataLo
 
     return (best_model_state_dict, train_losses, val_losses, train_accuracies, val_accuracies)
 
-def test_model(model : torch.nn.Module, test_loader : DataLoader, device : torch.device) -> float:
+def test_model(model : torch.nn.Module, test_loader : DataLoader, device : torch.device) -> tuple[float, list[int], list[int]]:
 
     total = 0
     correct = 0
+    all_predictions = []
+    all_labels = []
     with torch.no_grad():
         for x_test, y_test in test_loader:
             x_test = x_test.to(device)
@@ -82,14 +84,15 @@ def test_model(model : torch.nn.Module, test_loader : DataLoader, device : torch
             _, predicted = torch.max(y_pred_test.data, 1)
             total += y_test.size(0)
             correct += (predicted == y_test).sum().item()
+            all_predictions.extend(predicted.cpu().numpy())
+            all_labels.extend(y_test.cpu().numpy())
 
     test_accuracy = 100 * correct / total
-    return test_accuracy
+    return test_accuracy, all_predictions, all_labels
 
 def _train_individual_model(model : torch.nn.Module, train_loader : DataLoader, optimizer : torch.optim.Optimizer,
                             loss : torch.nn.modules.loss._Loss, device : torch.device) -> None:
     model.train()
-    train_loss = 0
     for x, y in iter(train_loader):
         x = x.to(device)
         y = y.to(device)
@@ -98,7 +101,6 @@ def _train_individual_model(model : torch.nn.Module, train_loader : DataLoader, 
         l = loss(y_pred, y)
         l.backward()
         optimizer.step()
-        train_loss += l.item()
     return
 
 def _calculate_loss_accuracy(model : torch.nn.Module, loader : DataLoader, loss : torch.nn.modules.loss._Loss, device : torch.device) -> tuple[float, float]:

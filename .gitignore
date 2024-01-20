@@ -167,5 +167,7 @@ report/*
 !report/*.pdf
 !report/*.tex
 !report/*.bib
+!report/*.png
 
 .vscode
+results.txt
